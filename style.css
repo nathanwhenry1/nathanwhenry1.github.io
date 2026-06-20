@@ -4,6 +4,8 @@
   --accent: #3a5a8c;
   --bg: #fdfdfc;
   --rule: #e6e6e3;
+  /* swap this one line to try a different font */
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 * { box-sizing: border-box; }
@@ -14,7 +16,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--fg);
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--mono);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
@@ -67,7 +69,7 @@ a {
 a:hover { border-bottom-color: var(--accent); }
 
 .prompt-label {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--mono);
   font-size: 0.85rem;
   color: var(--muted);
   margin: 0 0 0.6rem;
@@ -82,7 +84,7 @@ ul.terminal {
   list-style: none;
   padding-left: 0;
   margin: 0 0 1rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--mono);
   font-size: 0.9rem;
 }
 
@@ -118,7 +120,7 @@ ul.terminal li::before {
 .note {
   color: var(--muted);
   font-size: 0.85rem;
-  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--mono);
 }
 
 .paper-title { font-style: italic; }
@@ -126,13 +128,13 @@ ul.terminal li::before {
 .authors,
 .venue { color: var(--muted); }
 
-.links { font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 0.85rem; }
+.links { font-family: var(--mono); font-size: 0.85rem; }
 
 footer {
   margin-top: 3.5rem;
   padding-top: 1.2rem;
   border-top: 1px solid var(--rule);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--mono);
   font-size: 0.85rem;
 }
 
