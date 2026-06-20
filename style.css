@@ -1,9 +1,9 @@
 :root {
-  --fg: #1a1a1a;
-  --muted: #666;
-  --accent: #3a5a8c;
-  --bg: #fdfdfc;
-  --rule: #e6e6e3;
+  --fg: #cfe3cf;
+  --muted: #7d8c7d;
+  --accent: #6ee787;
+  --bg: #0c0f0c;
+  --rule: #1e261e;
   /* swap this one line to try a different font */
   --mono: "Ubuntu Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
@@ -166,13 +166,3 @@ footer {
 }
 
 .sep { color: var(--rule); margin: 0 0.5rem; }
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --fg: #e8e8e6;
-    --muted: #9a9a96;
-    --accent: #8fb0e0;
-    --bg: #15151a;
-    --rule: #2c2c33;
-  }
-}
