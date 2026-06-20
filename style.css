@@ -5,7 +5,7 @@
   --bg: #fdfdfc;
   --rule: #e6e6e3;
   /* swap this one line to try a different font */
-  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --mono: "Ubuntu Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 * { box-sizing: border-box; }
@@ -115,7 +115,25 @@ ul.terminal li::before {
   50% { opacity: 0; }
 }
 
-.papers li { margin-bottom: 1rem; }
+ul.papers {
+  list-style: none;
+  padding-left: 0;
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+}
+
+ul.papers li {
+  position: relative;
+  padding-left: 1.4rem;
+  margin-bottom: 1rem;
+}
+
+ul.papers li::before {
+  content: "\276F"; /* ❯ */
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+}
 
 .note {
   color: var(--muted);
