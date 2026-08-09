@@ -1,0 +1,9 @@
+# CV sources and builds live here but aren't part of the published site
+cv/
+cv.pdf
+
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.build.log

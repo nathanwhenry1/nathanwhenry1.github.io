@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32"
+     role="img" aria-label="Nathan Henry">
+  <title>Nathan Henry</title>
+  <rect width="32" height="32" rx="7" fill="#0c0f0c"/>
+  <g fill="#6ee787">
+    <rect x="5.5" y="5.5"   width="4.5" height="21"  rx="0.75"/>
+    <rect x="5.5" y="13.75" width="13"  height="4.5" rx="0.75"/>
+    <rect x="22"  y="5.5"   width="4.5" height="21"  rx="0.75"/>
+  </g>
+</svg>
