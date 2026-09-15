@@ -43,6 +43,10 @@ header {
   fill: var(--accent);
 }
 
+/* the mark doubles as a Lean goal line; the script in index.html widens the box
+   while it types and hands back this 1rem one if it stands down */
+.logo-goal { font-family: var(--mono); }
+
 h1 {
   font-size: 1.9rem;
   font-weight: 600;

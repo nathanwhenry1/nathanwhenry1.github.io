@@ -19,9 +19,12 @@
   <header>
     <svg class="logo" viewBox="0 0 21 21" width="21" height="21" fill="#6ee787"
          aria-hidden="true" focusable="false">
-      <rect x="0"    y="0"    width="4.5" height="21"  rx="0.75"/>
-      <rect x="0"    y="8.25" width="13"  height="4.5" rx="0.75"/>
-      <rect x="16.5" y="0"    width="4.5" height="21"  rx="0.75"/>
+      <g class="logo-mark">
+        <rect x="0" y="0"    width="4.5" height="21"  rx="0.75"/>
+        <rect x="0" y="8.25" width="13"  height="4.5" rx="0.75"/>
+      </g>
+      <text class="logo-goal" x="16.5" y="17.17" xml:space="preserve"></text>
+      <rect class="logo-cursor" x="16.5" y="0" width="4.5" height="21" rx="0.75"/>
     </svg>
     <h1>Nathan Henry</h1>
   </header>
@@ -85,5 +88,299 @@
   </footer>
 
 </main>
+<script>
+/* The header mark doubles as a Lean goal line: the left bar and crossbar read as
+   a turnstile, and the right bar is the cursor sitting in the 3.5-unit gap the H
+   already carries. It types three goals, then the cursor slides the last one away
+   in one move that carries straight on into the gap, is repelled short of contact,
+   and settles back into the H, holds there a beat, and goes again. */
+(function () {
+  "use strict";
+
+  var svg = document.querySelector(".logo");
+  if (!svg || !window.requestAnimationFrame) return;
+  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+  var mark = svg.querySelector(".logo-mark"),
+      text = svg.querySelector(".logo-goal"),
+      cur  = svg.querySelector(".logo-cursor");
+  if (!mark || !text || !cur) return;
+
+  var GOALS = [
+    "\u2200 m : Model, Aligned m",
+    "\u2200 m : Model, \u2200 x : OOD, m x \u2208 Expected x",
+    "\u2200 m : Model, AI.GoesWell (deploy m)"
+  ];
+
+  /* timing, ms */
+  var KEY = 48, JITTER = 0.35, HOLD = 1800, DEL = 12, BEAT = 140,
+      SWEEP = 420, BLINK = 1100, REST = 2200;
+
+  /* geometry, viewBox units: 21 u is 1rem, and the H's own gap is 3.5 u */
+  var VB = 21, L_INNER = 13, R_INNER = 16.5, HALF = 1.75,
+      TEXT_EM = 15 / 17, SQUASH = 0.11;
+  var FONT = TEXT_EM * VB;
+
+  /* Rebound: released from rest at the innermost point into a well that is stiff
+     on the inward side and soft on the outward side, which is how magnets behave.
+     A symmetric spring couples the two swings and caps the recoil at about twice
+     the approach depth; splitting the stiffness lets the pieces fly apart while
+     barely penetrating inward. Damping only ever removes energy, so no later swing
+     reaches as deep as the first -- the pieces cannot touch. RATIO was solved
+     offline for a 6.8 u recoil; everything else is derived. */
+  var CLOSEST = 0.22, ZETA = 0.12, PERIOD = 0.230, RATIO = 37.5038, DT = 1 / 6000;
+  var P_DEEP = HALF * (1 - CLOSEST), K_OUT = Math.pow(2 * Math.PI / PERIOD, 2);
+
+  var track = (function () {
+    var kIn = K_OUT * RATIO, c = 2 * ZETA * Math.sqrt(K_OUT);
+    var u = P_DEEP, v = 0, out = [u];
+    for (var i = 0; i < 30000; i++) {
+      var a = -(u > 0 ? kIn : K_OUT) * u - c * v;
+      v += a * DT;
+      u += v * DT;
+      out.push(u);
+      if (Math.abs(u) < 0.010 && Math.abs(v) < 0.06) break;
+    }
+    return out;
+  })();
+  var TAIL = (track.length - 1) * DT * 1000;
+
+  function reboundU(ms) {
+    var f = (ms / 1000) / DT, i = Math.floor(f);
+    if (i >= track.length - 1) return track[track.length - 1];
+    return track[i] + (track[i + 1] - track[i]) * (f - i);
+  }
+
+  var LINES = GOALS.map(function (g) { return Array.from(g); });
+  var W = [], vbW = 0, sweepW = 0, evs = [], TOTAL = 0;
+
+  /* Character advance is measured off the rendered text rather than assumed from
+     a monospace grid: Ubuntu Mono has no glyph for the logic symbols, so those
+     fall back to a system face with a different advance and a counted cursor
+     would drift off the end of the line. */
+  function measure() {
+    svg.setAttribute("viewBox", "0 0 1000 " + VB);
+    text.setAttribute("font-size", FONT.toFixed(3));
+    text.setAttribute("y", ((VB + 0.72 * FONT) / 2).toFixed(2));
+    var widest = 0;
+    W = [];
+    for (var i = 0; i < LINES.length; i++) {
+      var row = [0];
+      for (var n = 1; n <= LINES[i].length; n++) {
+        text.textContent = LINES[i].slice(0, n).join("");
+        row.push(text.getComputedTextLength());
+      }
+      if (row[row.length - 1] > widest) widest = row[row.length - 1];
+      W.push(row);
+    }
+    text.textContent = "";
+    sweepW = W[W.length - 1][LINES[LINES.length - 1].length];
+    vbW = Math.ceil(R_INNER + widest + 4.5 + 6);
+  }
+
+  function commonPrefix(a, b) {
+    var i = 0;
+    while (i < a.length && i < b.length && a[i] === b[i]) i++;
+    return i;
+  }
+
+  /* Goals that share a binder share their keystrokes: backspace only as far as
+     the prefix the next line still needs, the way you would actually edit one. */
+  function buildTimeline() {
+    var jit = function (base) { return base * (1 - JITTER + 2 * JITTER * Math.random()); };
+    evs = [];
+    var T = 0, onScreen = 0;
+    LINES.forEach(function (chars, li) {
+      for (var n = onScreen + 1; n <= chars.length; n++) {
+        var d = jit(KEY);
+        evs.push({ t0: T, t1: T + d, k: "type", li: li, n: n });
+        T += d;
+      }
+      evs.push({ t0: T, t1: T + HOLD, k: "hold", li: li, n: chars.length });
+      T += HOLD;
+
+      if (li === LINES.length - 1) {
+        var s0 = T;
+        evs.push({ t0: T, t1: T + SWEEP, k: "sweep", li: li, s0: s0 });
+        T += SWEEP;
+        evs.push({ t0: T, t1: T + TAIL, k: "bounce", li: li, s0: s0 });
+        T += TAIL;
+        evs.push({ t0: T, t1: T + REST, k: "rest", li: li, n: 0 });
+        T += REST;
+        return;
+      }
+      var keep = commonPrefix(chars, LINES[li + 1]);
+      for (var m = chars.length - 1; m >= keep; m--) {
+        var dd = jit(DEL);
+        evs.push({ t0: T, t1: T + dd, k: "del", li: li, n: m });
+        T += dd;
+      }
+      evs.push({ t0: T, t1: T + BEAT, k: "beat", li: li, n: keep });
+      T += BEAT;
+      onScreen = keep;
+    });
+    TOTAL = T;
+  }
+
+  function at(t) {
+    var lo = 0, hi = evs.length - 1;
+    while (lo < hi) {
+      var mid = (lo + hi) >> 1;
+      if (evs[mid].t1 <= t) lo = mid + 1; else hi = mid;
+    }
+    return evs[lo];
+  }
+
+  /* One continuous eased move for the closing gesture: from the end of the last
+     line, past the cursor's resting spot, into the barrier. No stop at home, so
+     there is no seam between the slide and the impact. */
+  function retOff(ms) {
+    if (ms <= 0) return sweepW;
+    if (ms < SWEEP) {
+      var x = ms / SWEEP;
+      return sweepW - (sweepW + P_DEEP) * (x * x * x * (x * (x * 6 - 15) + 10));
+    }
+    return -reboundU(ms - SWEEP);
+  }
+
+  function charsAt(li, w) {
+    var row = W[li];
+    if (w <= 0) return 0;
+    var lo = 0, hi = row.length - 1;
+    while (lo < hi) {
+      var mid = (lo + hi + 1) >> 1;
+      if (row[mid] <= w) lo = mid; else hi = mid - 1;
+    }
+    return lo;
+  }
+
+  function place(textW, u, squash) {
+    var s = 1 - SQUASH * squash;
+    mark.setAttribute("transform",
+      "translate(" + (u + L_INNER * (1 - s)) + " 0) scale(" + s + " 1)");
+    cur.setAttribute("transform",
+      "translate(" + (R_INNER * (1 - s) - u + textW) + " 0) scale(" + s + " 1)");
+  }
+
+  function flash(comp) {
+    if (comp <= 0) return "";
+    var k = Math.pow(comp, 0.7);
+    return "rgb(" + Math.round(110 + 124 * k) + "," +
+                    Math.round(231 + 24 * k) + "," +
+                    Math.round(135 + 105 * k) + ")";
+  }
+
+  function frame(t) {
+    var ev = at(t), txt, textW, u = 0, comp = 0;
+
+    if (ev.k === "sweep" || ev.k === "bounce") {
+      var off = retOff(t - ev.s0);
+      txt = LINES[ev.li].slice(0, charsAt(ev.li, off)).join("");
+      textW = off > 0 ? off : 0;
+      u = off < 0 ? -off : 0;
+      comp = Math.min(1, u / HALF);
+    } else {
+      txt = LINES[ev.li].slice(0, ev.n).join("");
+      textW = W[ev.li][ev.n];
+    }
+
+    text.textContent = txt;
+    place(textW, u, comp);
+
+    var col = flash(comp);
+    mark.style.fill = col;
+    cur.style.fill = col;
+
+    var idle = (ev.k === "hold" || ev.k === "beat");
+    cur.style.opacity =
+      (idle && Math.floor((t - ev.t0) / (BLINK / 2)) % 2) ? "0" : "1";
+  }
+
+  /* Back to the plain 1rem box the markup ships with, so a logo that is not
+     animating takes up no more room than the H it is. */
+  function standDown() {
+    text.textContent = "";
+    place(0, 0, 0);
+    mark.style.fill = "";
+    cur.style.fill = "";
+    cur.style.opacity = "1";
+    svg.setAttribute("viewBox", "0 0 " + VB + " " + VB);
+    svg.style.width = "";
+  }
+
+  var raf = null, t0 = null, running = false;
+
+  function step(now) {
+    if (t0 === null) t0 = now;
+    var t = now - t0;
+    if (t >= TOTAL) { t0 = now; t = 0; }
+    frame(t);
+    raf = requestAnimationFrame(step);
+  }
+
+  function fits() {
+    var avail = svg.parentNode.clientWidth;
+    return avail > 0 && (vbW / VB) * parseFloat(
+      getComputedStyle(document.documentElement).fontSize || "17") <= avail;
+  }
+
+  function start() {
+    if (!fits()) { standDown(); return; }
+    buildTimeline();
+    svg.setAttribute("viewBox", "0 0 " + vbW + " " + VB);
+    svg.style.width = (vbW / VB).toFixed(3) + "rem";
+    running = true;
+    t0 = null;
+    if (!raf) raf = requestAnimationFrame(step);
+  }
+
+  function stop() {
+    running = false;
+    if (raf) { cancelAnimationFrame(raf); raf = null; }
+  }
+
+  /* It loops for as long as the page is open, so don't burn frames on a logo
+     nobody is looking at. rAF already idles in a hidden tab; this covers the
+     header being scrolled past. */
+  function watch() {
+    if (!window.IntersectionObserver) return;
+    new IntersectionObserver(function (entries) {
+      if (!running) return;
+      if (entries[0].isIntersecting) {
+        if (!raf) { t0 = null; raf = requestAnimationFrame(step); }
+      } else if (raf) {
+        cancelAnimationFrame(raf);
+        raf = null;
+      }
+    }).observe(svg);
+  }
+
+  var resizeTimer = null;
+  window.addEventListener("resize", function () {
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () {
+      var narrow = svg.getAttribute("viewBox") === "0 0 " + VB + " " + VB;
+      if (running && !narrow && !fits()) { stop(); standDown(); }
+      else if (!running && fits()) { start(); }
+    }, 200);
+  });
+
+  var started = false;
+  function boot() {
+    if (started) return;
+    started = true;
+    measure();
+    watch();
+    start();
+  }
+
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(boot);
+    setTimeout(boot, 2000);
+  } else {
+    boot();
+  }
+})();
+</script>
 </body>
 </html>
